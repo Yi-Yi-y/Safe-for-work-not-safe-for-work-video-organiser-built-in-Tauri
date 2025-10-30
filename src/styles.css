@@ -1,0 +1,290 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #4a1c75 0%, #6b2d8e 25%, #7d3ba0 50%, #8e4bb3 75%, #4a1c75 100%);
+    background-size: 400% 400%;
+    animation: gradientShift 20s ease infinite;
+    color: #ffffff;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+}
+
+@keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 14px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #8b5cf6 0%, #6b46c1 100%);
+    border-radius: 10px;
+    border: 2px solid rgba(0, 0, 0, 0.3);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #a78bfa 0%, #8b5cf6 100%);
+}
+
+/* PixiJS Canvas Container - Full Screen Background */
+#pixi-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    background: transparent;
+}
+
+#pixi-container canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+/* UI Overlay - DOM Elements */
+#ui-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+    pointer-events: none;
+}
+
+#ui-overlay > * {
+    pointer-events: auto;
+}
+
+/* Toolbar */
+#toolbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 44px;
+    background: rgba(30, 30, 30, 0.75);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    z-index: 100;
+}
+
+#toolbar h1 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+}
+
+/* Failed Thumbnails Banner */
+#failed-banner {
+    position: fixed;
+    top: 102px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100% - 16px);
+    max-width: 1400px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: rgba(185, 28, 28, 0.15);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 2px solid rgba(185, 28, 28, 0.4);
+    border-radius: 10px;
+    z-index: 150;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.banner-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.banner-icon {
+    font-size: 16px;
+}
+
+.banner-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.banner-text strong {
+    font-size: 14px;
+    color: #fca5a5;
+}
+
+.banner-subtext {
+    font-size: 11px;
+    color: #fecaca;
+    opacity: 0.9;
+}
+
+.move-corrupted-btn {
+    padding: 6px 16px;
+    background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+    border: none;
+    border-radius: 8px;
+    color: white;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.4);
+}
+
+.move-corrupted-btn:hover {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 12px rgba(220, 38, 38, 0.5);
+}
+
+/* Horizontal Filter Panel Container */
+#filter-panel-container {
+    position: fixed;
+    top: 50px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    padding: 10px 20px;
+    background: rgba(139, 92, 246, 0.25);
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
+    border-radius: 12px;
+    border: 2px solid rgba(167, 139, 250, 0.3);
+    z-index: 150;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 30px rgba(139, 92, 246, 0.2);
+}
+
+#orientation-filter-panel,
+#column-filter-panel {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.filter-label {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.8);
+    font-weight: 600;
+    margin-right: 4px;
+}
+
+.filter-btn {
+    padding: 6px 14px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    min-width: 65px;
+}
+
+.filter-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: rgba(255, 255, 255, 0.9);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.filter-btn.active {
+    background: rgba(255, 255, 255, 0.25);
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.4);
+    font-weight: 600;
+}
+
+#controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+#controls button {
+    padding: 6px 12px;
+    background: #0066ff;
+    border: none;
+    border-radius: 6px;
+    color: white;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background 0.2s;
+}
+
+#controls button:hover {
+    background: #0052cc;
+}
+
+#controls button:active {
+    background: #003d99;
+}
+
+#stats {
+    font-size: 11px;
+    color: #aaa;
+    margin-left: 8px;
+}
+
+/* Custom Scrollbar for Main Content */
+.custom-scrollbar {
+    position: fixed;
+    right: 0;
+    top: 150px; /* Below toolbar + filter panel */
+    width: 12px;
+    height: calc(100% - 150px);
+    background: rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(5px);
+    z-index: 150;
+    pointer-events: none;
+    display: none;
+    transition: opacity 0.2s ease;
+}
+
+.custom-scrollbar.visible {
+    display: block;
+}
+
+.scroll-thumb {
+    position: absolute;
+    right: 2px;
+    width: 8px;
+    background: rgba(138, 43, 226, 0.4);
+    border-radius: 4px;
+    transition: background 0.2s;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.scroll-thumb:hover {
+    background: rgba(138, 43, 226, 0.6);
+}
+

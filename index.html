@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VideoVault Tauri Test</title>
+    <link rel="stylesheet" href="/src/styles.css">
+</head>
+<body>
+    <!-- UI Overlay (DOM/CSS) -->
+    <div id="ui-overlay" class="app-ui-overlay">
+        <!-- Top Toolbar -->
+        <div id="toolbar" class="app-toolbar">
+            <h1 class="app-title">VideoVault</h1>
+            <div id="controls" class="toolbar-controls">
+                <button id="load-1k" class="control-btn load-btn">Load 1,000</button>
+                <button id="load-10k" class="control-btn load-btn">Load 10,000</button>
+                <button id="load-50k" class="control-btn load-btn">Load 50,000</button>
+                <button id="clear" class="control-btn clear-btn">Clear</button>
+                <span id="stats" class="stats-display">Items: 0 | FPS: 0</span>
+            </div>
+        </div>
+
+        <!-- Horizontal Filter Panel -->
+        <div id="filter-panel-container" class="filter-panel-wrapper">
+            <!-- Orientation Filters -->
+            <div id="orientation-filter-panel" class="orientation-filters">
+                <button class="filter-btn orientation-btn active" data-orientation="all">All</button>
+                <button class="filter-btn orientation-btn" data-orientation="landscape">Landscape</button>
+                <button class="filter-btn orientation-btn" data-orientation="portrait">Portrait</button>
+                <button class="filter-btn orientation-btn" data-orientation="square">Square</button>
+                <button class="filter-btn orientation-btn" data-orientation="panorama">Panorama</button>
+            </div>
+
+            <!-- Column Count Filters -->
+            <div id="column-filter-panel" class="column-filters">
+                <span class="filter-label column-label">Columns:</span>
+                <button class="filter-btn column-btn" data-columns="2">2</button>
+                <button class="filter-btn column-btn active" data-columns="3">3</button>
+                <button class="filter-btn column-btn" data-columns="4">4</button>
+            </div>
+        </div>
+
+        <!-- Failed Thumbnails Banner -->
+        <div id="failed-banner" class="alert-banner failed-thumbnails-banner">
+            <div class="banner-left banner-content">
+                <span class="banner-icon alert-icon">▶ ⚠️</span>
+                <div class="banner-text alert-text">
+                    <strong class="banner-title">Failed Thumbnails</strong>
+                    <span class="banner-subtext banner-description">45 videos failed to generate thumbnails. Click header to expand.</span>
+                </div>
+            </div>
+            <button class="move-corrupted-btn action-btn">📁 Move to CORRUPTED</button>
+        </div>
+    </div>
+
+    <!-- PixiJS Canvas Container -->
+    <div id="pixi-container" class="grid-container video-grid" data-component="thumbnail-grid"></div>
+
+    <!-- Custom Scrollbar -->
+    <div id="custom-scrollbar" class="custom-scrollbar">
+        <div id="scroll-thumb" class="scroll-thumb"></div>
+    </div>
+
+    <!-- Load PixiJS from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.3.2/pixi.min.js"></script>
+
+    <!-- Tauri API -->
+    <script>
+        // Tauri API polyfill for browser testing
+        window.__TAURI__ = window.__TAURI__ || {
+            tauri: {
+                invoke: async (cmd, args) => {
+                    console.log('Mock invoke:', cmd, args);
+                    if (cmd === 'get_mock_thumbnails') {
+                        const count = args.count || 1000;
+                        return Array.from({ length: count }, (_, i) => {
+                            let orientation;
+                            const rand = i % 5;
+                            if (rand === 0) orientation = 'portrait';
+                            else if (rand === 1) orientation = 'square';
+                            else if (rand === 2) orientation = 'panorama';
+                            else orientation = 'landscape';
+
+                            return {
+                                id: i,
+                                title: `Video_${String(i).padStart(5, '0')}`,
+                                width: 320,
+                                height: 180,
+                                orientation: orientation,
+                                tags: ['test', 'mock'],
+                                file_path: `C:\\Videos\\video_${String(i).padStart(5, '0')}.mp4`
+                            };
+                        });
+                    }
+                    return null;
+                }
+            }
+        };
+    </script>
+
+    <!-- Main App Logic -->
+    <script type="module" src="/src/app.js"></script>
+</body>
+</html>
