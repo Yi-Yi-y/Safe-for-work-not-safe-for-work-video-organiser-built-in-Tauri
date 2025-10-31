@@ -95,31 +95,39 @@ async function init() {
         // Calculate available width for the grid
         const availableWidth = window.innerWidth - SIDE_MARGIN - SCROLLBAR_WIDTH;
 
-        // Calculate thumbnail width to fit 3 columns with spacing
+        // Calculate thumbnail width to fit current COLUMNS with spacing
         const totalGapWidth = (COLUMNS - 1) * THUMBNAIL_SPACING;
         const calculatedWidth = Math.floor((availableWidth - totalGapWidth) / COLUMNS);
 
-        // For landscape (16:9 aspect ratio)
+        // For landscape (16:9 aspect ratio) - width fills column
         THUMBNAIL_WIDTH_LANDSCAPE = calculatedWidth;
         THUMBNAIL_HEIGHT_LANDSCAPE = Math.floor(calculatedWidth * 9 / 16);
 
-        // For portrait (9:16 aspect ratio)
-        THUMBNAIL_WIDTH_PORTRAIT = Math.floor(calculatedWidth * 9 / 16);
-        THUMBNAIL_HEIGHT_PORTRAIT = calculatedWidth;
+        // For portrait - width fills column, height varies by column count
+        // 2 columns: more compact (1.25:1 ratio)
+        // 3-4 columns: moderately taller (1.4:1 ratio)
+        THUMBNAIL_WIDTH_PORTRAIT = calculatedWidth;
+        if (COLUMNS === 2) {
+            THUMBNAIL_HEIGHT_PORTRAIT = Math.floor(calculatedWidth * 1.25);
+        } else {
+            THUMBNAIL_HEIGHT_PORTRAIT = Math.floor(calculatedWidth * 1.4);
+        }
 
-        // For square (1:1 aspect ratio)
+        // For square (1:1 aspect ratio) - width fills column
         THUMBNAIL_WIDTH_SQUARE = calculatedWidth;
         THUMBNAIL_HEIGHT_SQUARE = calculatedWidth;
 
-        // For panorama (wider aspect, ~2.4:1)
+        // For panorama (wider aspect, ~2.4:1) - width fills column
         THUMBNAIL_WIDTH_PANORAMA = calculatedWidth;
         THUMBNAIL_HEIGHT_PANORAMA = Math.floor(calculatedWidth * 10 / 24);
 
         console.log('=== DYNAMIC THUMBNAIL SIZES ===');
+        console.log('Columns:', COLUMNS);
         console.log('Window width:', window.innerWidth);
         console.log('Available width:', availableWidth);
-        console.log('Calculated thumb width:', calculatedWidth);
+        console.log('Calculated column width:', calculatedWidth);
         console.log('Landscape:', THUMBNAIL_WIDTH_LANDSCAPE, 'x', THUMBNAIL_HEIGHT_LANDSCAPE);
+        console.log('Portrait:', THUMBNAIL_WIDTH_PORTRAIT, 'x', THUMBNAIL_HEIGHT_PORTRAIT);
         console.log('===============================');
     }
 
@@ -243,9 +251,17 @@ async function init() {
         blankText.y = tagY + 3;
         container.addChild(blankText);
 
-        // Glassmorphism overlay at bottom of thumbnail (overlaid on thumbnail)
+        // Glassmorphism overlay position depends on orientation and column count
         const glassHeight = 50;
-        const glassY = thumbHeight - glassHeight - 5;
+        let glassY;
+
+        // For portrait mode with 2 or 3 columns: center the text overlay
+        // For portrait mode with 4 columns or all other modes: text at bottom
+        if (currentOrientation === 'portrait' && (COLUMNS === 2 || COLUMNS === 3)) {
+            glassY = (thumbHeight - glassHeight) / 2; // Centered
+        } else {
+            glassY = thumbHeight - glassHeight - 5; // Bottom
+        }
 
         // Multi-layered glassmorphism effect
         // Layer 1: Darker semi-transparent base
@@ -269,51 +285,61 @@ async function init() {
         glassHighlight.endFill();
         container.addChild(glassHighlight);
 
-        // Filename in cyan with drop shadow - using Consolas for clear i/l distinction
+        // Calculate text area width (full glass width minus padding)
+        const textPadding = 20;
+        const textAreaWidth = thumbWidth - textPadding - 10;
+
+        // Filename in cyan with drop shadow - larger font with letter spacing
         const filenameShadow = new PIXI.Text(data.title, {
-            fontSize: 13,
+            fontSize: 18,
             fill: 0x000000,
             fontFamily: 'Consolas, "Courier New", monospace',
             fontWeight: 'bold',
             wordWrap: true,
-            wordWrapWidth: thumbWidth - 30
+            wordWrapWidth: textAreaWidth,
+            letterSpacing: 2 // Add space between characters
         });
-        filenameShadow.x = 16;
+        filenameShadow.x = textPadding / 2;
         filenameShadow.y = glassY + 7;
         filenameShadow.alpha = 0.6;
         container.addChild(filenameShadow);
 
         const filename = new PIXI.Text(data.title, {
-            fontSize: 13,
+            fontSize: 18,
             fill: 0x00ffff, // Bright cyan
             fontFamily: 'Consolas, "Courier New", monospace',
             fontWeight: 'bold',
             wordWrap: true,
-            wordWrapWidth: thumbWidth - 30
+            wordWrapWidth: textAreaWidth,
+            letterSpacing: 2 // Add space between characters
         });
-        filename.x = 15;
+        filename.x = textPadding / 2 - 1;
         filename.y = glassY + 6;
         container.addChild(filename);
 
-        // Additional metadata with drop shadow
+        // Additional metadata with drop shadow - larger font
         const metadataText = `${data.file_path.split('\\').pop()}`;
         const metadataShadow = new PIXI.Text(metadataText, {
-            fontSize: 10,
+            fontSize: 13,
             fill: 0x000000,
-            fontFamily: 'Consolas, "Courier New", monospace'
+            fontFamily: 'Consolas, "Courier New", monospace',
+            wordWrap: true,
+            wordWrapWidth: textAreaWidth
         });
-        metadataShadow.x = 16;
-        metadataShadow.y = glassY + 27;
+        metadataShadow.x = textPadding / 2;
+        metadataShadow.y = glassY + 29;
         metadataShadow.alpha = 0.6;
         container.addChild(metadataShadow);
 
         const metadata = new PIXI.Text(metadataText, {
-            fontSize: 10,
+            fontSize: 13,
             fill: 0x66ffff, // Light cyan
-            fontFamily: 'Consolas, "Courier New", monospace'
+            fontFamily: 'Consolas, "Courier New", monospace',
+            wordWrap: true,
+            wordWrapWidth: textAreaWidth
         });
-        metadata.x = 15;
-        metadata.y = glassY + 26;
+        metadata.x = textPadding / 2 - 1;
+        metadata.y = glassY + 28;
         container.addChild(metadata);
 
         // Hover effect with glow
