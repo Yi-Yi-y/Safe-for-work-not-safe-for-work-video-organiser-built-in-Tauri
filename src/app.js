@@ -67,7 +67,9 @@ async function init() {
     const TOOLBAR_HEIGHT = 150; // Compact toolbar + filter panel + banner spacing
     const SCROLLBAR_WIDTH = 12;
     const SIDE_MARGIN = 12;
-    const COLUMNS = 3; // Always 3 columns
+
+    // Dynamic column count based on orientation
+    let COLUMNS = 3;
 
     // Dynamic thumbnail sizes calculated based on window width
     let THUMBNAIL_WIDTH_LANDSCAPE = 320;
@@ -152,19 +154,19 @@ async function init() {
         // Drop shadow effect (simulated with offset rectangles)
         const shadow1 = new PIXI.Graphics();
         shadow1.beginFill(0x000000, 0.15);
-        shadow1.drawRoundedRect(4, 4, thumbWidth, thumbHeight + 55, 14);
+        shadow1.drawRoundedRect(4, 4, thumbWidth, thumbHeight, 14);
         shadow1.endFill();
         container.addChild(shadow1);
 
         const shadow2 = new PIXI.Graphics();
         shadow2.beginFill(0x000000, 0.15);
-        shadow2.drawRoundedRect(3, 3, thumbWidth, thumbHeight + 55, 14);
+        shadow2.drawRoundedRect(3, 3, thumbWidth, thumbHeight, 14);
         shadow2.endFill();
         container.addChild(shadow2);
 
         const shadow3 = new PIXI.Graphics();
         shadow3.beginFill(0x000000, 0.2);
-        shadow3.drawRoundedRect(2, 2, thumbWidth, thumbHeight + 55, 14);
+        shadow3.drawRoundedRect(2, 2, thumbWidth, thumbHeight, 14);
         shadow3.endFill();
         container.addChild(shadow3);
 
@@ -172,7 +174,7 @@ async function init() {
         const bg = new PIXI.Graphics();
         bg.lineStyle(2, 0x8b5cf6, 0.8);
         bg.beginFill(0x1f1f1f);
-        bg.drawRoundedRect(0, 0, thumbWidth, thumbHeight + 55, 14);
+        bg.drawRoundedRect(0, 0, thumbWidth, thumbHeight, 14);
         bg.endFill();
         container.addChild(bg);
 
@@ -241,34 +243,77 @@ async function init() {
         blankText.y = tagY + 3;
         container.addChild(blankText);
 
-        // Bottom info panel with semi-transparent background
-        const infoPanel = new PIXI.Graphics();
-        infoPanel.beginFill(0x000000, 0.7);
-        infoPanel.drawRoundedRect(4, thumbHeight - 4, thumbWidth - 8, 55, 8);
-        infoPanel.endFill();
-        container.addChild(infoPanel);
+        // Glassmorphism overlay at bottom of thumbnail (overlaid on thumbnail)
+        const glassHeight = 50;
+        const glassY = thumbHeight - glassHeight - 5;
 
-        // Filename in cyan (in the bottom info panel)
-        const filename = new PIXI.Text(data.title, {
-            fontSize: 12,
-            fill: 0x22d3ee,
-            fontFamily: 'Segoe UI, sans-serif',
+        // Multi-layered glassmorphism effect
+        // Layer 1: Darker semi-transparent base
+        const glassBase = new PIXI.Graphics();
+        glassBase.beginFill(0x000000, 0.35);
+        glassBase.drawRoundedRect(5, glassY, thumbWidth - 10, glassHeight, 8);
+        glassBase.endFill();
+        container.addChild(glassBase);
+
+        // Layer 2: Lighter overlay for glass effect
+        const glassOverlay = new PIXI.Graphics();
+        glassOverlay.beginFill(0xffffff, 0.08);
+        glassOverlay.drawRoundedRect(5, glassY, thumbWidth - 10, glassHeight, 8);
+        glassOverlay.endFill();
+        container.addChild(glassOverlay);
+
+        // Layer 3: Top edge highlight
+        const glassHighlight = new PIXI.Graphics();
+        glassHighlight.beginFill(0xffffff, 0.12);
+        glassHighlight.drawRoundedRect(5, glassY, thumbWidth - 10, 2, 8);
+        glassHighlight.endFill();
+        container.addChild(glassHighlight);
+
+        // Filename in cyan with drop shadow - using Consolas for clear i/l distinction
+        const filenameShadow = new PIXI.Text(data.title, {
+            fontSize: 13,
+            fill: 0x000000,
+            fontFamily: 'Consolas, "Courier New", monospace',
             fontWeight: 'bold',
             wordWrap: true,
-            wordWrapWidth: thumbWidth - 20
+            wordWrapWidth: thumbWidth - 30
         });
-        filename.x = 10;
-        filename.y = thumbHeight + 4;
+        filenameShadow.x = 16;
+        filenameShadow.y = glassY + 7;
+        filenameShadow.alpha = 0.6;
+        container.addChild(filenameShadow);
+
+        const filename = new PIXI.Text(data.title, {
+            fontSize: 13,
+            fill: 0x00ffff, // Bright cyan
+            fontFamily: 'Consolas, "Courier New", monospace',
+            fontWeight: 'bold',
+            wordWrap: true,
+            wordWrapWidth: thumbWidth - 30
+        });
+        filename.x = 15;
+        filename.y = glassY + 6;
         container.addChild(filename);
 
-        // Additional metadata (simulated)
-        const metadata = new PIXI.Text(`ID: ${data.id} | ${data.orientation}`, {
-            fontSize: 9,
-            fill: 0xcccccc,
-            fontFamily: 'Segoe UI, sans-serif'
+        // Additional metadata with drop shadow
+        const metadataText = `${data.file_path.split('\\').pop()}`;
+        const metadataShadow = new PIXI.Text(metadataText, {
+            fontSize: 10,
+            fill: 0x000000,
+            fontFamily: 'Consolas, "Courier New", monospace'
         });
-        metadata.x = 10;
-        metadata.y = thumbHeight + 24;
+        metadataShadow.x = 16;
+        metadataShadow.y = glassY + 27;
+        metadataShadow.alpha = 0.6;
+        container.addChild(metadataShadow);
+
+        const metadata = new PIXI.Text(metadataText, {
+            fontSize: 10,
+            fill: 0x66ffff, // Light cyan
+            fontFamily: 'Consolas, "Courier New", monospace'
+        });
+        metadata.x = 15;
+        metadata.y = glassY + 26;
         container.addChild(metadata);
 
         // Hover effect with glow
@@ -278,14 +323,14 @@ async function init() {
             bg.clear();
             bg.lineStyle(3, 0xc084fc, 1);
             bg.beginFill(0x2a2a2a);
-            bg.drawRoundedRect(0, 0, thumbWidth, thumbHeight + 55, 14);
+            bg.drawRoundedRect(0, 0, thumbWidth, thumbHeight, 14);
             bg.endFill();
         });
         container.on('pointerout', () => {
             bg.clear();
             bg.lineStyle(2, 0x8b5cf6, 0.8);
             bg.beginFill(0x1f1f1f);
-            bg.drawRoundedRect(0, 0, thumbWidth, thumbHeight + 55, 14);
+            bg.drawRoundedRect(0, 0, thumbWidth, thumbHeight, 14);
             bg.endFill();
         });
         container.on('pointertap', () => {
@@ -304,14 +349,19 @@ async function init() {
         // Filter by orientation
         if (currentOrientation === 'portrait') {
             filteredThumbnails = thumbnails.filter(t => t.orientation === 'portrait');
+            COLUMNS = portraitColumns; // Use selected portrait column count (2, 3, or 4)
         } else if (currentOrientation === 'landscape') {
             filteredThumbnails = thumbnails.filter(t => t.orientation === 'landscape');
+            COLUMNS = 3; // Always 3 for landscape
         } else if (currentOrientation === 'square') {
             filteredThumbnails = thumbnails.filter(t => t.orientation === 'square');
+            COLUMNS = 3; // Always 3 for square
         } else if (currentOrientation === 'panorama') {
             filteredThumbnails = thumbnails.filter(t => t.orientation === 'panorama');
+            COLUMNS = 3; // Always 3 for panorama
         } else {
             filteredThumbnails = thumbnails;
+            COLUMNS = 3; // Always 3 for "all" mode
         }
 
         // Recalculate thumbnail sizes for current window width
@@ -378,7 +428,24 @@ async function init() {
     function updateVisibleSprites() {
         if (filteredThumbnails.length === 0) return;
 
-        const maxRowHeight = THUMBNAIL_HEIGHT_PORTRAIT + 55 + THUMBNAIL_SPACING;
+        // Calculate row height based on current orientation
+        // Card height = thumbnail height (metadata is overlaid)
+        let cardHeight;
+        if (currentOrientation === 'portrait') {
+            cardHeight = THUMBNAIL_HEIGHT_PORTRAIT;
+        } else if (currentOrientation === 'square') {
+            cardHeight = THUMBNAIL_HEIGHT_SQUARE;
+        } else if (currentOrientation === 'panorama') {
+            cardHeight = THUMBNAIL_HEIGHT_PANORAMA;
+        } else if (currentOrientation === 'landscape') {
+            cardHeight = THUMBNAIL_HEIGHT_LANDSCAPE;
+        } else {
+            // For "all" mode, use portrait height (tallest)
+            cardHeight = THUMBNAIL_HEIGHT_PORTRAIT;
+        }
+
+        // Row height = card height + vertical spacing (10px, same as horizontal)
+        const rowHeight = cardHeight + THUMBNAIL_SPACING;
 
         // Calculate grid width based on current mode
         let gridWidth;
@@ -417,10 +484,10 @@ async function init() {
         const viewportHeight = window.innerHeight;
         const bufferRows = 2; // Render extra rows above/below for smooth scrolling
 
-        const firstVisibleRow = Math.max(0, Math.floor(scrollY / maxRowHeight) - bufferRows);
+        const firstVisibleRow = Math.max(0, Math.floor(scrollY / rowHeight) - bufferRows);
         const lastVisibleRow = Math.min(
             Math.ceil(filteredThumbnails.length / COLUMNS),
-            Math.ceil((scrollY + viewportHeight) / maxRowHeight) + bufferRows
+            Math.ceil((scrollY + viewportHeight) / rowHeight) + bufferRows
         );
 
         const firstVisibleIndex = firstVisibleRow * COLUMNS;
@@ -452,7 +519,7 @@ async function init() {
                 else thumbWidth = THUMBNAIL_WIDTH_LANDSCAPE;
 
                 const x = startX + col * (thumbWidth + THUMBNAIL_SPACING);
-                const y = startY + row * maxRowHeight;
+                const y = startY + row * rowHeight;
 
                 sprite = createThumbnailSprite(data, x, y);
                 viewport.addChild(sprite);
@@ -470,8 +537,24 @@ async function init() {
     const contentHeight = () => {
         if (filteredThumbnails.length === 0) return 0;
         const rows = Math.ceil(filteredThumbnails.length / COLUMNS);
-        const maxRowHeight = THUMBNAIL_HEIGHT_PORTRAIT + 55;
-        return TOOLBAR_HEIGHT + rows * (maxRowHeight + THUMBNAIL_SPACING) + THUMBNAIL_SPACING;
+
+        // Calculate card height based on current orientation (metadata is overlaid)
+        let cardHeight;
+        if (currentOrientation === 'portrait') {
+            cardHeight = THUMBNAIL_HEIGHT_PORTRAIT;
+        } else if (currentOrientation === 'square') {
+            cardHeight = THUMBNAIL_HEIGHT_SQUARE;
+        } else if (currentOrientation === 'panorama') {
+            cardHeight = THUMBNAIL_HEIGHT_PANORAMA;
+        } else if (currentOrientation === 'landscape') {
+            cardHeight = THUMBNAIL_HEIGHT_LANDSCAPE;
+        } else {
+            // For "all" mode, use portrait height (tallest)
+            cardHeight = THUMBNAIL_HEIGHT_PORTRAIT;
+        }
+
+        const rowHeight = cardHeight + THUMBNAIL_SPACING;
+        return TOOLBAR_HEIGHT + rows * rowHeight + THUMBNAIL_SPACING;
     };
 
     // ============================================
