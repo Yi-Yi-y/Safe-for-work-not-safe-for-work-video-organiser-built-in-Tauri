@@ -381,13 +381,13 @@ async function init() {
             COLUMNS = 3; // Always 3 for landscape
         } else if (currentOrientation === 'square') {
             filteredThumbnails = thumbnails.filter(t => t.orientation === 'square');
-            COLUMNS = 3; // Always 3 for square
+            COLUMNS = 4; // 4 columns for square (2 rows of 4 = 8 visible)
         } else if (currentOrientation === 'panorama') {
             filteredThumbnails = thumbnails.filter(t => t.orientation === 'panorama');
             COLUMNS = 3; // Always 3 for panorama
         } else {
             filteredThumbnails = thumbnails;
-            COLUMNS = 3; // Always 3 for "all" mode
+            COLUMNS = 3; // Always 3 for "all" mode (will fix later)
         }
 
         // Recalculate thumbnail sizes for current window width

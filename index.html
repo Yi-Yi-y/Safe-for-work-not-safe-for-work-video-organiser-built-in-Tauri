@@ -17,6 +17,7 @@
                 <button id="load-10k" class="control-btn load-btn">Load 10,000</button>
                 <button id="load-50k" class="control-btn load-btn">Load 50,000</button>
                 <button id="clear" class="control-btn clear-btn">Clear</button>
+                <button id="debug-toggle" class="control-btn debug-btn">🐛 Debug</button>
                 <span id="stats" class="stats-display">Items: 0 | FPS: 0</span>
             </div>
         </div>
@@ -51,6 +52,25 @@
                 </div>
             </div>
             <button class="move-corrupted-btn action-btn">📁 Move to CORRUPTED</button>
+        </div>
+
+        <!-- Debug Panel -->
+        <div id="debug-panel" class="debug-panel" style="display: none;">
+            <div class="debug-header">
+                <div class="debug-tabs">
+                    <button class="debug-tab active" data-filter="all">All</button>
+                    <button class="debug-tab" data-filter="error">Errors</button>
+                    <button class="debug-tab" data-filter="info">Info</button>
+                    <button class="debug-tab" data-filter="success">Success</button>
+                    <button class="debug-tab" data-filter="warning">Warnings</button>
+                </div>
+                <div class="debug-actions">
+                    <button id="debug-clear" class="debug-action-btn">Clear</button>
+                    <button id="debug-copy-all" class="debug-action-btn">Copy All</button>
+                    <button id="debug-close" class="debug-action-btn">✕</button>
+                </div>
+            </div>
+            <div id="debug-logs" class="debug-logs"></div>
         </div>
     </div>
 
