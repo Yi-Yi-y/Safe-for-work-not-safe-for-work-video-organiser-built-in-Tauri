@@ -318,6 +318,8 @@ async function init() {
     const MAX_CONCURRENT_LOADS = 20;
     let currentlyLoadingImages = 0;
     const imageLoadQueue = [];
+    let imagesLoaded = 0;
+    let imagesFailed = 0;
 
     // Pre-create ONE white texture for maximum batching (tint for colors)
     const cardTextures = {};
@@ -360,13 +362,21 @@ async function init() {
                     sprite.placeholder.alpha = 0;
                 }
             }
+            imagesLoaded++;
             currentlyLoadingImages--;
             processImageQueue();
+
+            // Log progress every 100 images
+            if (imagesLoaded % 100 === 0) {
+                console.log(`[IMAGE LOADING] Progress: ${imagesLoaded} loaded, ${imagesFailed} failed, ${imageLoadQueue.length} queued`);
+            }
         });
 
-        texture.baseTexture.on('error', () => {
+        texture.baseTexture.on('error', (err) => {
+            imagesFailed++;
             currentlyLoadingImages--;
             processImageQueue();
+            console.warn(`[IMAGE LOADING] Failed to load: ${sprite.imageUrl}`, err);
         });
     }
 
@@ -454,17 +464,32 @@ async function init() {
             thumbHeight = THUMBNAIL_HEIGHT_LANDSCAPE;
         }
 
-        // MAXIMUM BATCHING: One texture + tinting for colors
+        // Create a placeholder colored rectangle (will be replaced by real image)
         const colors = [0x3498db, 0xe74c3c, 0x2ecc71, 0xf39c12, 0x9b59b6, 0x1abc9c];
         const color = colors[data.id % colors.length];
 
-        // All sprites share ONE texture, tinted for color (perfect batching!)
-        const texture = createCardTexture(thumbWidth, thumbHeight);
-        const sprite = new PIXI.Sprite(texture);
-        sprite.tint = color;  // Tint the white texture
-        container.addChild(sprite);
+        const placeholderTexture = createCardTexture(thumbWidth, thumbHeight);
+        const placeholder = new PIXI.Sprite(placeholderTexture);
+        placeholder.tint = color;
+        container.addChild(placeholder);
 
-        // SKIP EVERYTHING ELSE FOR FPS TESTING
+        // Create the actual thumbnail sprite (initially hidden)
+        const thumbSprite = new PIXI.Sprite(PIXI.Texture.WHITE);
+        thumbSprite.width = thumbWidth;
+        thumbSprite.height = thumbHeight;
+        thumbSprite.alpha = 0; // Hidden until image loads
+        container.addChild(thumbSprite);
+
+        // Store references for image loading
+        container.thumbSprite = thumbSprite;
+        container.placeholder = placeholder;
+        container.imageUrl = data.thumbnail_url || data.file_path;
+
+        // Load the image if URL is provided and sprite is visible
+        if (container.imageUrl && container.visible) {
+            loadThumbnailImage(container);
+        }
+
         return container;
 
         // Top corner badges - interactive and translucent by default
@@ -721,6 +746,12 @@ async function init() {
         spritePool.clear();
         viewport.removeChildren();
 
+        // Reset image loading stats
+        imagesLoaded = 0;
+        imagesFailed = 0;
+        imageLoadQueue.length = 0;
+        currentlyLoadingImages = 0;
+
         // Get mock data from Tauri backend
         try {
             const invoke = window.__TAURI__?.tauri?.invoke || window.__TAURI_INVOKE__;
@@ -728,21 +759,38 @@ async function init() {
         } catch (err) {
             console.warn('Tauri invoke failed, using local mock:', err);
             thumbnails = Array.from({ length: count }, (_, i) => {
-                let orientation;
+                let orientation, width, height;
                 const rand = i % 5;
-                if (rand === 0) orientation = 'portrait';
-                else if (rand === 1) orientation = 'square';
-                else if (rand === 2) orientation = 'panorama';
-                else orientation = 'landscape';
+                if (rand === 0) {
+                    orientation = 'portrait';
+                    width = 400;
+                    height = 600;
+                } else if (rand === 1) {
+                    orientation = 'square';
+                    width = 500;
+                    height = 500;
+                } else if (rand === 2) {
+                    orientation = 'panorama';
+                    width = 800;
+                    height = 300;
+                } else {
+                    orientation = 'landscape';
+                    width = 640;
+                    height = 360;
+                }
+
+                // Use Lorem Picsum for random placeholder images
+                const thumbnail_url = `https://picsum.photos/seed/${i}/${width}/${height}`;
 
                 return {
                     id: i,
                     title: `Video_${String(i).padStart(5, '0')}`,
-                    width: 320,
-                    height: 180,
+                    width: width,
+                    height: height,
                     orientation: orientation,
                     tags: ['test', 'mock'],
-                    file_path: `C:\\Videos\\video_${String(i).padStart(5, '0')}.mp4`
+                    file_path: `C:\\Videos\\video_${String(i).padStart(5, '0')}.mp4`,
+                    thumbnail_url: thumbnail_url
                 };
             });
         }
@@ -856,6 +904,10 @@ async function init() {
                     spritePool.set(index, sprite);
                 } else {
                     sprite.visible = true;
+                    // Load image if not already loaded and has URL
+                    if (sprite.imageUrl && sprite.thumbSprite && sprite.thumbSprite.alpha === 0) {
+                        loadThumbnailImage(sprite);
+                    }
                 }
             }
 
