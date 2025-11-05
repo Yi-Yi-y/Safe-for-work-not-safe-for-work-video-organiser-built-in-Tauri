@@ -366,11 +366,15 @@ body {
 
 .debug-logs {
     flex: 1;
-    overflow-y: auto;
+    overflow-y: scroll !important;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
     padding: 12px;
     font-family: 'Consolas', 'Courier New', monospace;
     font-size: 12px;
     line-height: 1.6;
+    min-height: 0;
+    position: relative;
 }
 
 .debug-log-entry {
@@ -439,4 +443,50 @@ body {
     height: 1px;
     background: rgba(139, 92, 246, 0.3);
     margin: 4px 0;
+}
+
+/* Copy Feedback Toast */
+.copy-toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(52, 211, 153, 0.95);
+    color: #ffffff;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 10002;
+    animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+.debug-logs::-webkit-scrollbar {
+    width: 8px;
+}
+
+.debug-logs::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+}
+
+.debug-logs::-webkit-scrollbar-thumb {
+    background: rgba(139, 92, 246, 0.5);
+    border-radius: 4px;
+}
+
+.debug-logs::-webkit-scrollbar-thumb:hover {
+    background: rgba(139, 92, 246, 0.7);
 }

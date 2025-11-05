@@ -1,3 +1,230 @@
+// ============================================
+// DEBUG PANEL SYSTEM
+// ============================================
+
+const DebugPanel = {
+    logs: [],
+    currentFilter: 'all',
+    selectedLogs: new Set(),
+
+    init() {
+        const panel = document.getElementById('debug-panel');
+        const toggleBtn = document.getElementById('debug-toggle');
+        const closeBtn = document.getElementById('debug-close');
+        const clearBtn = document.getElementById('debug-clear');
+        const copyAllBtn = document.getElementById('debug-copy-all');
+        const logsContainer = document.getElementById('debug-logs');
+
+        // Toggle panel visibility
+        toggleBtn?.addEventListener('click', () => {
+            const isVisible = panel.style.display !== 'none';
+            panel.style.display = isVisible ? 'none' : 'flex';
+        });
+
+        closeBtn?.addEventListener('click', () => {
+            panel.style.display = 'none';
+        });
+
+        // Filter tabs
+        document.querySelectorAll('.debug-tab').forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                document.querySelectorAll('.debug-tab').forEach(t => t.classList.remove('active'));
+                e.target.classList.add('active');
+                this.currentFilter = e.target.dataset.filter;
+                this.render();
+            });
+        });
+
+        // Clear logs
+        clearBtn?.addEventListener('click', () => {
+            this.logs = [];
+            this.selectedLogs.clear();
+            this.render();
+        });
+
+        // Copy all visible logs
+        copyAllBtn?.addEventListener('click', () => {
+            this.copyFilteredLogs();
+        });
+
+        // Context menu for log entries
+        logsContainer?.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            const logEntry = e.target.closest('.debug-log-entry');
+            if (logEntry) {
+                this.showContextMenu(e.clientX, e.clientY, logEntry);
+            }
+        });
+
+        // Log selection
+        logsContainer?.addEventListener('click', (e) => {
+            const logEntry = e.target.closest('.debug-log-entry');
+            if (logEntry && e.ctrlKey) {
+                const index = parseInt(logEntry.dataset.index);
+                if (this.selectedLogs.has(index)) {
+                    this.selectedLogs.delete(index);
+                    logEntry.classList.remove('selected');
+                } else {
+                    this.selectedLogs.add(index);
+                    logEntry.classList.add('selected');
+                }
+            }
+        });
+
+        // Intercept console methods
+        this.interceptConsole();
+    },
+
+    interceptConsole() {
+        const originalLog = console.log;
+        const originalWarn = console.warn;
+        const originalError = console.error;
+        const originalInfo = console.info;
+
+        console.log = (...args) => {
+            this.addLog('info', args.join(' '));
+            originalLog.apply(console, args);
+        };
+
+        console.warn = (...args) => {
+            this.addLog('warning', args.join(' '));
+            originalWarn.apply(console, args);
+        };
+
+        console.error = (...args) => {
+            this.addLog('error', args.join(' '));
+            originalError.apply(console, args);
+        };
+
+        console.info = (...args) => {
+            this.addLog('info', args.join(' '));
+            originalInfo.apply(console, args);
+        };
+    },
+
+    addLog(type, message) {
+        const timestamp = new Date().toLocaleTimeString();
+        this.logs.push({ type, message, timestamp });
+
+        // Keep only last 1000 logs
+        if (this.logs.length > 1000) {
+            this.logs.shift();
+        }
+
+        this.render();
+    },
+
+    render() {
+        const logsContainer = document.getElementById('debug-logs');
+        if (!logsContainer) return;
+
+        const filteredLogs = this.currentFilter === 'all'
+            ? this.logs
+            : this.logs.filter(log => log.type === this.currentFilter);
+
+        logsContainer.innerHTML = filteredLogs.map((log, index) => `
+            <div class="debug-log-entry log-${log.type}" data-index="${index}">
+                <span class="debug-log-timestamp">${log.timestamp}</span>
+                <span>${log.message}</span>
+            </div>
+        `).join('');
+    },
+
+    showContextMenu(x, y, logEntry) {
+        // Remove existing context menu
+        document.querySelectorAll('.debug-context-menu').forEach(el => el.remove());
+
+        const menu = document.createElement('div');
+        menu.className = 'debug-context-menu';
+        menu.style.left = x + 'px';
+        menu.style.top = y + 'px';
+
+        menu.innerHTML = `
+            <div class="debug-context-menu-item" data-action="copy-single">Copy This Log</div>
+            <div class="debug-context-menu-item" data-action="copy-selected">Copy Selected (${this.selectedLogs.size})</div>
+            <div class="debug-context-menu-divider"></div>
+            <div class="debug-context-menu-item" data-action="copy-filter">Copy All ${this.currentFilter === 'all' ? '' : this.currentFilter.charAt(0).toUpperCase() + this.currentFilter.slice(1)} Logs</div>
+            <div class="debug-context-menu-item" data-action="copy-all">Copy All Logs</div>
+        `;
+
+        menu.addEventListener('click', (e) => {
+            const action = e.target.dataset.action;
+            const index = parseInt(logEntry.dataset.index);
+
+            if (action === 'copy-single') {
+                this.copyLog(index);
+            } else if (action === 'copy-selected') {
+                this.copySelectedLogs();
+            } else if (action === 'copy-filter') {
+                this.copyFilteredLogs();
+            } else if (action === 'copy-all') {
+                this.copyAllLogs();
+            }
+
+            menu.remove();
+        });
+
+        document.body.appendChild(menu);
+
+        // Close menu on click outside
+        setTimeout(() => {
+            document.addEventListener('click', () => menu.remove(), { once: true });
+        }, 100);
+    },
+
+    showToast(message) {
+        const toast = document.createElement('div');
+        toast.className = 'copy-toast';
+        toast.textContent = message;
+        document.body.appendChild(toast);
+
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(-50%) translateY(-20px)';
+            setTimeout(() => toast.remove(), 300);
+        }, 2000);
+    },
+
+    copyLog(index) {
+        const log = this.logs[index];
+        navigator.clipboard.writeText(`[${log.timestamp}] ${log.type.toUpperCase()}: ${log.message}`);
+        this.showToast('✓ Log copied to clipboard');
+    },
+
+    copySelectedLogs() {
+        const selected = Array.from(this.selectedLogs)
+            .map(index => {
+                const log = this.logs[index];
+                return `[${log.timestamp}] ${log.type.toUpperCase()}: ${log.message}`;
+            })
+            .join('\n');
+        navigator.clipboard.writeText(selected);
+        this.showToast(`✓ ${this.selectedLogs.size} logs copied to clipboard`);
+    },
+
+    copyFilteredLogs() {
+        const filtered = (this.currentFilter === 'all' ? this.logs : this.logs.filter(log => log.type === this.currentFilter))
+            .map(log => `[${log.timestamp}] ${log.type.toUpperCase()}: ${log.message}`)
+            .join('\n');
+        navigator.clipboard.writeText(filtered);
+        const count = this.currentFilter === 'all' ? this.logs.length : this.logs.filter(log => log.type === this.currentFilter).length;
+        this.showToast(`✓ ${count} logs copied to clipboard`);
+    },
+
+    copyAllLogs() {
+        const all = this.logs.map(log => `[${log.timestamp}] ${log.type.toUpperCase()}: ${log.message}`).join('\n');
+        navigator.clipboard.writeText(all);
+        this.showToast(`✓ All ${this.logs.length} logs copied to clipboard`);
+    }
+};
+
+// Initialize debug panel when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => DebugPanel.init());
+} else {
+    DebugPanel.init();
+}
+
 console.log('VideoVault Tauri Test - Initializing...');
 
 // Wait for PixiJS to load from CDN
@@ -18,9 +245,9 @@ function waitForPixi() {
 
 // Main initialization
 async function init() {
-    console.log('Waiting for PixiJS to load...');
+    console.log('[INIT] Step 1: Waiting for PixiJS to load...');
     await waitForPixi();
-    console.log('PixiJS loaded!');
+    console.log('[INIT] Step 2: PixiJS loaded!');
 
     // ============================================
     // PIXI APPLICATION SETUP
@@ -31,7 +258,7 @@ async function init() {
         height: window.innerHeight,
         backgroundColor: 0x1a1a1a,
         backgroundAlpha: 0,
-        antialias: true,
+        antialias: false,  // Disable for better performance
         resolution: window.devicePixelRatio || 1,
         autoDensity: true,
         powerPreference: 'high-performance',
@@ -87,6 +314,72 @@ async function init() {
     let currentOrientation = 'all';
     let portraitColumns = 3;
 
+    // Image loading optimization - limit concurrent loads
+    const MAX_CONCURRENT_LOADS = 20;
+    let currentlyLoadingImages = 0;
+    const imageLoadQueue = [];
+
+    // Pre-create ONE white texture for maximum batching (tint for colors)
+    const cardTextures = {};
+    function createCardTexture(width, height) {
+        const key = `${width}x${height}`;
+        if (cardTextures[key]) return cardTextures[key];
+
+        const graphics = new PIXI.Graphics();
+        graphics.beginFill(0xffffff);  // White - will be tinted
+        graphics.drawRect(0, 0, width, height);
+        graphics.endFill();
+
+        const texture = app.renderer.generateTexture(graphics);
+        cardTextures[key] = texture;
+        graphics.destroy();
+        return texture;
+    }
+
+    // Function to load thumbnail image with queue management
+    function loadThumbnailImage(sprite) {
+        if (currentlyLoadingImages >= MAX_CONCURRENT_LOADS) {
+            // Queue for later
+            imageLoadQueue.push(sprite);
+            return;
+        }
+
+        currentlyLoadingImages++;
+
+        const texture = PIXI.Texture.from(sprite.imageUrl, {
+            resourceOptions: {
+                crossOrigin: 'anonymous'
+            }
+        });
+
+        texture.baseTexture.on('loaded', () => {
+            if (sprite.thumbSprite) {
+                sprite.thumbSprite.texture = texture;
+                sprite.thumbSprite.alpha = 1;
+                if (sprite.placeholder) {
+                    sprite.placeholder.alpha = 0;
+                }
+            }
+            currentlyLoadingImages--;
+            processImageQueue();
+        });
+
+        texture.baseTexture.on('error', () => {
+            currentlyLoadingImages--;
+            processImageQueue();
+        });
+    }
+
+    // Process queued image loads
+    function processImageQueue() {
+        while (imageLoadQueue.length > 0 && currentlyLoadingImages < MAX_CONCURRENT_LOADS) {
+            const sprite = imageLoadQueue.shift();
+            if (sprite && sprite.visible) {
+                loadThumbnailImage(sprite);
+            }
+        }
+    }
+
     // ============================================
     // DYNAMIC THUMBNAIL SIZE CALCULATION
     // ============================================
@@ -128,6 +421,8 @@ async function init() {
         console.log('Calculated column width:', calculatedWidth);
         console.log('Landscape:', THUMBNAIL_WIDTH_LANDSCAPE, 'x', THUMBNAIL_HEIGHT_LANDSCAPE);
         console.log('Portrait:', THUMBNAIL_WIDTH_PORTRAIT, 'x', THUMBNAIL_HEIGHT_PORTRAIT);
+        console.log('Square:', THUMBNAIL_WIDTH_SQUARE, 'x', THUMBNAIL_HEIGHT_SQUARE);
+        console.log('Panorama:', THUMBNAIL_WIDTH_PANORAMA, 'x', THUMBNAIL_HEIGHT_PANORAMA);
         console.log('===============================');
     }
 
@@ -159,204 +454,213 @@ async function init() {
             thumbHeight = THUMBNAIL_HEIGHT_LANDSCAPE;
         }
 
-        // Drop shadow effect (simulated with offset rectangles)
-        const shadow1 = new PIXI.Graphics();
-        shadow1.beginFill(0x000000, 0.15);
-        shadow1.drawRoundedRect(4, 4, thumbWidth, thumbHeight, 14);
-        shadow1.endFill();
-        container.addChild(shadow1);
-
-        const shadow2 = new PIXI.Graphics();
-        shadow2.beginFill(0x000000, 0.15);
-        shadow2.drawRoundedRect(3, 3, thumbWidth, thumbHeight, 14);
-        shadow2.endFill();
-        container.addChild(shadow2);
-
-        const shadow3 = new PIXI.Graphics();
-        shadow3.beginFill(0x000000, 0.2);
-        shadow3.drawRoundedRect(2, 2, thumbWidth, thumbHeight, 14);
-        shadow3.endFill();
-        container.addChild(shadow3);
-
-        // Background card with rounded corners and gradient border
-        const bg = new PIXI.Graphics();
-        bg.lineStyle(2, 0x8b5cf6, 0.8);
-        bg.beginFill(0x1f1f1f);
-        bg.drawRoundedRect(0, 0, thumbWidth, thumbHeight, 14);
-        bg.endFill();
-        container.addChild(bg);
-
-        // Mock thumbnail image (colored rectangle with rounded corners)
+        // MAXIMUM BATCHING: One texture + tinting for colors
         const colors = [0x3498db, 0xe74c3c, 0x2ecc71, 0xf39c12, 0x9b59b6, 0x1abc9c];
         const color = colors[data.id % colors.length];
 
-        const thumb = new PIXI.Graphics();
-        thumb.beginFill(color);
-        thumb.drawRoundedRect(5, 5, thumbWidth - 10, thumbHeight - 10, 10);
-        thumb.endFill();
-        container.addChild(thumb);
+        // All sprites share ONE texture, tinted for color (perfect batching!)
+        const texture = createCardTexture(thumbWidth, thumbHeight);
+        const sprite = new PIXI.Sprite(texture);
+        sprite.tint = color;  // Tint the white texture
+        container.addChild(sprite);
 
-        // Top tag badges with blur effect simulation
-        const tagY = 8;
-        const tagSpacing = 52;
+        // SKIP EVERYTHING ELSE FOR FPS TESTING
+        return container;
 
-        // SFW badge
+        // Top corner badges - interactive and translucent by default
+        const badgeY = 8;
+        const badgeWidth = 80;  // A third bigger (60 * 1.33 = 80)
+        const badgeHeight = 26;
+
+        // Track badge selection state (starts as null = unselected)
+        let selectedBadge = null; // 'sfw' or 'nsfw' or null
+
+        // SFW badge - top LEFT corner (green, translucent by default)
+        const sfwBadgeContainer = new PIXI.Container();
+        sfwBadgeContainer.x = 8;
+        sfwBadgeContainer.y = badgeY;
+        sfwBadgeContainer.interactive = true;
+        sfwBadgeContainer.buttonMode = true;
+
         const sfwBadge = new PIXI.Graphics();
-        sfwBadge.beginFill(0x10b981, 0.85);
-        sfwBadge.drawRoundedRect(8, tagY, 48, 20, 10);
+        sfwBadge.lineStyle(2, 0xffffff, 0.4);  // White border for contrast
+        sfwBadge.beginFill(0x10b981, 0.3);  // Green with 30% opacity (transparent)
+        sfwBadge.drawRoundedRect(0, 0, badgeWidth, badgeHeight, 13);
         sfwBadge.endFill();
-        container.addChild(sfwBadge);
+        sfwBadgeContainer.addChild(sfwBadge);
 
         const sfwText = new PIXI.Text('SFW', {
-            fontSize: 11,
+            fontSize: 12,
             fill: 0xffffff,
-            fontFamily: 'Segoe UI, sans-serif',
-            fontWeight: 'bold'
+            fontFamily: 'Arial, sans-serif',
+            fontWeight: '500'
         });
-        sfwText.x = 20;
-        sfwText.y = tagY + 3;
-        container.addChild(sfwText);
+        sfwText.anchor.set(0.5);
+        sfwText.x = badgeWidth / 2;
+        sfwText.y = badgeHeight / 2;
+        sfwBadgeContainer.addChild(sfwText);
 
-        // NSFW badge
+        container.addChild(sfwBadgeContainer);
+
+        // NSFW badge - top RIGHT corner (red, translucent by default)
+        const nsfwBadgeContainer = new PIXI.Container();
+        nsfwBadgeContainer.x = thumbWidth - badgeWidth - 8;
+        nsfwBadgeContainer.y = badgeY;
+        nsfwBadgeContainer.interactive = true;
+        nsfwBadgeContainer.buttonMode = true;
+
         const nsfwBadge = new PIXI.Graphics();
-        nsfwBadge.beginFill(0xef4444, 0.85);
-        nsfwBadge.drawRoundedRect(8 + tagSpacing, tagY, 52, 20, 10);
+        nsfwBadge.lineStyle(2, 0xffffff, 0.4);  // White border for contrast
+        nsfwBadge.beginFill(0xef4444, 0.3);  // Red with 30% opacity (transparent)
+        nsfwBadge.drawRoundedRect(0, 0, badgeWidth, badgeHeight, 13);
         nsfwBadge.endFill();
-        container.addChild(nsfwBadge);
+        nsfwBadgeContainer.addChild(nsfwBadge);
 
         const nsfwText = new PIXI.Text('NSFW', {
             fontSize: 11,
             fill: 0xffffff,
-            fontFamily: 'Segoe UI, sans-serif',
-            fontWeight: 'bold'
+            fontFamily: 'Arial, sans-serif',
+            fontWeight: '500'
         });
-        nsfwText.x = 14 + tagSpacing;
-        nsfwText.y = tagY + 3;
-        container.addChild(nsfwText);
+        nsfwText.anchor.set(0.5);
+        nsfwText.x = badgeWidth / 2;
+        nsfwText.y = badgeHeight / 2;
+        nsfwBadgeContainer.addChild(nsfwText);
 
-        // Blank badge
-        const blankBadge = new PIXI.Graphics();
-        blankBadge.beginFill(0x6b7280, 0.85);
-        blankBadge.drawRoundedRect(8 + tagSpacing * 2, tagY, 48, 20, 10);
-        blankBadge.endFill();
-        container.addChild(blankBadge);
+        container.addChild(nsfwBadgeContainer);
 
-        const blankText = new PIXI.Text('Blank', {
-            fontSize: 11,
-            fill: 0xffffff,
-            fontFamily: 'Segoe UI, sans-serif',
-            fontWeight: 'bold'
+        // Badge click handlers - make selected badge saturated
+        sfwBadgeContainer.on('pointertap', (e) => {
+            e.stopPropagation(); // Don't trigger card click
+
+            if (selectedBadge === 'sfw') {
+                // Deselect
+                selectedBadge = null;
+                sfwBadge.clear();
+                sfwBadge.lineStyle(2, 0xffffff, 0.4);
+                sfwBadge.beginFill(0x10b981, 0.3);
+                sfwBadge.drawRoundedRect(0, 0, badgeWidth, badgeHeight, 13);
+                sfwBadge.endFill();
+            } else {
+                // Select SFW, deselect NSFW
+                selectedBadge = 'sfw';
+                sfwBadge.clear();
+                sfwBadge.lineStyle(2, 0xffffff, 0.8);  // Brighter border when selected
+                sfwBadge.beginFill(0x10b981, 1.0);  // Full opacity (saturated)
+                sfwBadge.drawRoundedRect(0, 0, badgeWidth, badgeHeight, 13);
+                sfwBadge.endFill();
+
+                // Deselect NSFW
+                nsfwBadge.clear();
+                nsfwBadge.lineStyle(2, 0xffffff, 0.4);
+                nsfwBadge.beginFill(0xef4444, 0.3);
+                nsfwBadge.drawRoundedRect(0, 0, badgeWidth, badgeHeight, 13);
+                nsfwBadge.endFill();
+            }
+            console.log('SFW badge clicked:', selectedBadge === 'sfw' ? 'SELECTED' : 'DESELECTED');
         });
-        blankText.x = 14 + tagSpacing * 2;
-        blankText.y = tagY + 3;
-        container.addChild(blankText);
 
-        // Glassmorphism overlay position depends on orientation and column count
-        const glassHeight = 50;
-        let glassY;
+        nsfwBadgeContainer.on('pointertap', (e) => {
+            e.stopPropagation(); // Don't trigger card click
 
-        // For portrait mode with 2 or 3 columns: center the text overlay
-        // For portrait mode with 4 columns or all other modes: text at bottom
+            if (selectedBadge === 'nsfw') {
+                // Deselect
+                selectedBadge = null;
+                nsfwBadge.clear();
+                nsfwBadge.lineStyle(2, 0xffffff, 0.4);
+                nsfwBadge.beginFill(0xef4444, 0.3);
+                nsfwBadge.drawRoundedRect(0, 0, badgeWidth, badgeHeight, 13);
+                nsfwBadge.endFill();
+            } else {
+                // Select NSFW, deselect SFW
+                selectedBadge = 'nsfw';
+                nsfwBadge.clear();
+                nsfwBadge.lineStyle(2, 0xffffff, 0.8);  // Brighter border when selected
+                nsfwBadge.beginFill(0xef4444, 1.0);  // Full opacity (saturated)
+                nsfwBadge.drawRoundedRect(0, 0, badgeWidth, badgeHeight, 13);
+                nsfwBadge.endFill();
+
+                // Deselect SFW
+                sfwBadge.clear();
+                sfwBadge.lineStyle(2, 0xffffff, 0.4);
+                sfwBadge.beginFill(0x10b981, 0.3);
+                sfwBadge.drawRoundedRect(0, 0, badgeWidth, badgeHeight, 13);
+                sfwBadge.endFill();
+            }
+            console.log('NSFW badge clicked:', selectedBadge === 'nsfw' ? 'SELECTED' : 'DESELECTED');
+        });
+
+        // Optimized overlay background - simpler approach without expensive gradients
         if (currentOrientation === 'portrait' && (COLUMNS === 2 || COLUMNS === 3)) {
-            glassY = (thumbHeight - glassHeight) / 2; // Centered
+            // Portrait 2-3 column: Solid dark background in center
+            const overlayHeight = 80;
+            const overlayY = (thumbHeight - overlayHeight) / 2;
+            const centeredOverlay = new PIXI.Graphics();
+            centeredOverlay.beginFill(0x000000, 0.85);
+            centeredOverlay.drawRoundedRect(3, overlayY, thumbWidth - 6, overlayHeight, 0);
+            centeredOverlay.endFill();
+            container.addChild(centeredOverlay);
         } else {
-            glassY = thumbHeight - glassHeight - 5; // Bottom
+            // All other modes: Simple bottom overlay (no expensive multi-layer gradient)
+            const overlayHeight = 60;
+            const overlayY = thumbHeight - overlayHeight - 3;
+            const bottomOverlay = new PIXI.Graphics();
+            bottomOverlay.beginFill(0x000000, 0.75);  // Single solid overlay instead of 20-layer gradient
+            bottomOverlay.drawRoundedRect(3, overlayY, thumbWidth - 6, overlayHeight, 0);
+            bottomOverlay.endFill();
+            container.addChild(bottomOverlay);
         }
 
-        // Multi-layered glassmorphism effect
-        // Layer 1: Darker semi-transparent base
-        const glassBase = new PIXI.Graphics();
-        glassBase.beginFill(0x000000, 0.35);
-        glassBase.drawRoundedRect(5, glassY, thumbWidth - 10, glassHeight, 8);
-        glassBase.endFill();
-        container.addChild(glassBase);
+        // Filename text styling depends on portrait mode
+        const textPadding = 12;
+        const textAreaWidth = thumbWidth - textPadding * 2;
 
-        // Layer 2: Lighter overlay for glass effect
-        const glassOverlay = new PIXI.Graphics();
-        glassOverlay.beginFill(0xffffff, 0.08);
-        glassOverlay.drawRoundedRect(5, glassY, thumbWidth - 10, glassHeight, 8);
-        glassOverlay.endFill();
-        container.addChild(glassOverlay);
-
-        // Layer 3: Top edge highlight
-        const glassHighlight = new PIXI.Graphics();
-        glassHighlight.beginFill(0xffffff, 0.12);
-        glassHighlight.drawRoundedRect(5, glassY, thumbWidth - 10, 2, 8);
-        glassHighlight.endFill();
-        container.addChild(glassHighlight);
-
-        // Calculate text area width (full glass width minus padding)
-        const textPadding = 20;
-        const textAreaWidth = thumbWidth - textPadding - 10;
-
-        // Filename in cyan with drop shadow - larger font with letter spacing
-        const filenameShadow = new PIXI.Text(data.title, {
-            fontSize: 18,
-            fill: 0x000000,
-            fontFamily: 'Consolas, "Courier New", monospace',
-            fontWeight: 'bold',
-            wordWrap: true,
-            wordWrapWidth: textAreaWidth,
-            letterSpacing: 2 // Add space between characters
-        });
-        filenameShadow.x = textPadding / 2;
-        filenameShadow.y = glassY + 7;
-        filenameShadow.alpha = 0.6;
-        container.addChild(filenameShadow);
-
-        const filename = new PIXI.Text(data.title, {
-            fontSize: 18,
-            fill: 0x00ffff, // Bright cyan
-            fontFamily: 'Consolas, "Courier New", monospace',
-            fontWeight: 'bold',
-            wordWrap: true,
-            wordWrapWidth: textAreaWidth,
-            letterSpacing: 2 // Add space between characters
-        });
-        filename.x = textPadding / 2 - 1;
-        filename.y = glassY + 6;
+        let filename;
+        if (currentOrientation === 'portrait' && (COLUMNS === 2 || COLUMNS === 3)) {
+            // Portrait 2-3 column: Centered cyan title (matching old app)
+            filename = new PIXI.Text(data.title, {
+                fontSize: 16,  // 1rem
+                fill: 0x00d9ff,  // #00D9FF cyan
+                fontFamily: 'Arial Black, Arial Bold, sans-serif',
+                fontWeight: '900',
+                wordWrap: true,
+                wordWrapWidth: textAreaWidth,
+                align: 'center'
+            });
+            filename.anchor.set(0.5, 0.5);
+            filename.x = thumbWidth / 2;
+            filename.y = thumbHeight / 2;
+        } else {
+            // Default: White text at bottom
+            filename = new PIXI.Text(data.title, {
+                fontSize: 12,  // 0.75rem
+                fill: 0xffffff,  // White
+                fontFamily: 'Arial, sans-serif',
+                fontWeight: '500',
+                wordWrap: true,
+                wordWrapWidth: textAreaWidth,
+                lineHeight: 16
+            });
+            filename.x = textPadding;
+            filename.y = thumbHeight - 8 - filename.height;  // 8px from bottom
+        }
         container.addChild(filename);
 
-        // Additional metadata with drop shadow - larger font
-        const metadataText = `${data.file_path.split('\\').pop()}`;
-        const metadataShadow = new PIXI.Text(metadataText, {
-            fontSize: 13,
-            fill: 0x000000,
-            fontFamily: 'Consolas, "Courier New", monospace',
-            wordWrap: true,
-            wordWrapWidth: textAreaWidth
-        });
-        metadataShadow.x = textPadding / 2;
-        metadataShadow.y = glassY + 29;
-        metadataShadow.alpha = 0.6;
-        container.addChild(metadataShadow);
-
-        const metadata = new PIXI.Text(metadataText, {
-            fontSize: 13,
-            fill: 0x66ffff, // Light cyan
-            fontFamily: 'Consolas, "Courier New", monospace',
-            wordWrap: true,
-            wordWrapWidth: textAreaWidth
-        });
-        metadata.x = textPadding / 2 - 1;
-        metadata.y = glassY + 28;
-        container.addChild(metadata);
-
-        // Hover effect with glow
+        // Hover effect matching old application
         container.interactive = true;
         container.buttonMode = true;
         container.on('pointerover', () => {
             bg.clear();
-            bg.lineStyle(3, 0xc084fc, 1);
-            bg.beginFill(0x2a2a2a);
-            bg.drawRoundedRect(0, 0, thumbWidth, thumbHeight, 14);
+            bg.lineStyle(3, 0x8b5cf6, 0);
+            bg.beginFill(0x8b5cf6, 0.6);  // rgba(139, 92, 246, 0.6) on hover
+            bg.drawRoundedRect(0, 0, thumbWidth, thumbHeight, 16);
             bg.endFill();
         });
         container.on('pointerout', () => {
             bg.clear();
-            bg.lineStyle(2, 0x8b5cf6, 0.8);
-            bg.beginFill(0x1f1f1f);
-            bg.drawRoundedRect(0, 0, thumbWidth, thumbHeight, 14);
+            bg.lineStyle(3, 0x8b5cf6, 0);
+            bg.beginFill(0x8b5cf6, 0.4);  // rgba(139, 92, 246, 0.4) default
+            bg.drawRoundedRect(0, 0, thumbWidth, thumbHeight, 16);
             bg.endFill();
         });
         container.on('pointertap', () => {
@@ -451,6 +755,10 @@ async function init() {
     // VIEWPORT CULLING - Only render visible items
     // ============================================
 
+    // Track previous visible range to optimize visibility updates
+    let prevFirstVisibleIndex = -1;
+    let prevLastVisibleIndex = -1;
+
     function updateVisibleSprites() {
         if (filteredThumbnails.length === 0) return;
 
@@ -492,23 +800,10 @@ async function init() {
         const startX = SIDE_MARGIN + Math.max(0, (availableWidth - gridWidth) / 2);
         const startY = TOOLBAR_HEIGHT;
 
-        // DEBUG: Log the calculations
-        console.log('=== GRID POSITIONING DEBUG ===');
-        console.log('Window width:', window.innerWidth);
-        console.log('Grid width:', gridWidth);
-        console.log('Columns:', COLUMNS, '(fixed)');
-        console.log('Available width:', availableWidth);
-        console.log('Start X:', startX);
-        console.log('Grid end X:', startX + gridWidth);
-        console.log('Should end at:', availableWidth + SIDE_MARGIN);
-        console.log('Centered offset:', (availableWidth - gridWidth) / 2);
-        console.log('Right overflow?', (startX + gridWidth) > (window.innerWidth - SCROLLBAR_WIDTH));
-        console.log('=============================');
-
         // Calculate visible range with buffer
         const scrollY = -viewportY;
         const viewportHeight = window.innerHeight;
-        const bufferRows = 2; // Render extra rows above/below for smooth scrolling
+        const bufferRows = 0; // NO buffer - only render exactly what's visible for max FPS
 
         const firstVisibleRow = Math.max(0, Math.floor(scrollY / rowHeight) - bufferRows);
         const lastVisibleRow = Math.min(
@@ -519,40 +814,54 @@ async function init() {
         const firstVisibleIndex = firstVisibleRow * COLUMNS;
         const lastVisibleIndex = Math.min(filteredThumbnails.length, lastVisibleRow * COLUMNS);
 
-        // Hide sprites outside visible range
-        spritePool.forEach((sprite, index) => {
-            if (index < firstVisibleIndex || index >= lastVisibleIndex) {
-                sprite.visible = false;
+        // Only update visibility if range changed (optimization!)
+        if (firstVisibleIndex !== prevFirstVisibleIndex || lastVisibleIndex !== prevLastVisibleIndex) {
+            // Hide sprites that are no longer visible
+            if (prevFirstVisibleIndex !== -1) {
+                // Hide sprites before new visible range
+                for (let i = prevFirstVisibleIndex; i < Math.min(firstVisibleIndex, prevLastVisibleIndex); i++) {
+                    const sprite = spritePool.get(i);
+                    if (sprite) sprite.visible = false;
+                }
+                // Hide sprites after new visible range
+                for (let i = Math.max(lastVisibleIndex, prevFirstVisibleIndex); i < prevLastVisibleIndex; i++) {
+                    const sprite = spritePool.get(i);
+                    if (sprite) sprite.visible = false;
+                }
             }
-        });
 
-        // Show/create sprites in visible range
-        for (let index = firstVisibleIndex; index < lastVisibleIndex; index++) {
-            if (index >= filteredThumbnails.length) break;
+            // Show/create sprites in visible range
+            for (let index = firstVisibleIndex; index < lastVisibleIndex; index++) {
+                if (index >= filteredThumbnails.length) break;
 
-            let sprite = spritePool.get(index);
+                let sprite = spritePool.get(index);
 
-            if (!sprite) {
-                // Create new sprite
-                const data = filteredThumbnails[index];
-                const col = index % COLUMNS;
-                const row = Math.floor(index / COLUMNS);
+                if (!sprite) {
+                    // Create new sprite
+                    const data = filteredThumbnails[index];
+                    const col = index % COLUMNS;
+                    const row = Math.floor(index / COLUMNS);
 
-                let thumbWidth;
-                if (data.orientation === 'portrait') thumbWidth = THUMBNAIL_WIDTH_PORTRAIT;
-                else if (data.orientation === 'square') thumbWidth = THUMBNAIL_WIDTH_SQUARE;
-                else if (data.orientation === 'panorama') thumbWidth = THUMBNAIL_WIDTH_PANORAMA;
-                else thumbWidth = THUMBNAIL_WIDTH_LANDSCAPE;
+                    let thumbWidth;
+                    if (data.orientation === 'portrait') thumbWidth = THUMBNAIL_WIDTH_PORTRAIT;
+                    else if (data.orientation === 'square') thumbWidth = THUMBNAIL_WIDTH_SQUARE;
+                    else if (data.orientation === 'panorama') thumbWidth = THUMBNAIL_WIDTH_PANORAMA;
+                    else thumbWidth = THUMBNAIL_WIDTH_LANDSCAPE;
 
-                const x = startX + col * (thumbWidth + THUMBNAIL_SPACING);
-                const y = startY + row * rowHeight;
+                    const x = startX + col * (thumbWidth + THUMBNAIL_SPACING);
+                    const y = startY + row * rowHeight;
 
-                sprite = createThumbnailSprite(data, x, y);
-                viewport.addChild(sprite);
-                spritePool.set(index, sprite);
-            } else {
-                sprite.visible = true;
+                    sprite = createThumbnailSprite(data, x, y);
+                    viewport.addChild(sprite);
+                    spritePool.set(index, sprite);
+                } else {
+                    sprite.visible = true;
+                }
             }
+
+            // Update previous range
+            prevFirstVisibleIndex = firstVisibleIndex;
+            prevLastVisibleIndex = lastVisibleIndex;
         }
     }
 
@@ -616,33 +925,58 @@ async function init() {
     }
 
     window.addEventListener('wheel', (e) => {
+        // Allow native scrolling inside debug panel and other scrollable UI elements
+        const debugPanel = document.getElementById('debug-logs');
+        if (debugPanel && debugPanel.contains(e.target)) {
+            return; // Let the debug panel scroll naturally
+        }
+
         e.preventDefault();
 
         const maxScroll = Math.max(0, contentHeight() - window.innerHeight);
         targetViewportY = Math.max(-maxScroll, Math.min(0, targetViewportY - e.deltaY));
     }, { passive: false });
 
-    // Smooth scroll interpolation
+    // Optimized scroll interpolation - skip when not actively scrolling
     let lastUpdateY = 0;
+    let scrollFrameCount = 0;
     app.ticker.add(() => {
-        viewportY += (targetViewportY - viewportY) * scrollSpeed;
-        viewport.y = Math.round(viewportY);
-        updateScrollbar();
+        scrollFrameCount++;
 
-        // Update visible sprites when scroll position changes significantly
-        if (Math.abs(viewportY - lastUpdateY) > 100) {
+        // Only interpolate if there's significant difference (save CPU when idle)
+        const diff = Math.abs(targetViewportY - viewportY);
+        if (diff > 0.5) {
+            viewportY += (targetViewportY - viewportY) * scrollSpeed;
+            viewport.y = Math.round(viewportY);
+
+            // Update scrollbar less frequently
+            if (scrollFrameCount % 2 === 0) {
+                updateScrollbar();
+            }
+        }
+
+        // Update visible sprites only every 30 frames OR very large position change
+        if (scrollFrameCount % 30 === 0 || Math.abs(viewportY - lastUpdateY) > 1500) {
             updateVisibleSprites();
             lastUpdateY = viewportY;
         }
     });
 
     // ============================================
-    // FPS COUNTER
+    // FPS COUNTER WITH STATISTICS
     // ============================================
 
     let frameCount = 0;
     let lastTime = performance.now();
     let fps = 0;
+
+    // FPS statistics tracking
+    let fpsHistory = [];
+    let minFPS = Infinity;
+    let maxFPS = 0;
+    let avgFPS = 0;
+    let efficiency = 0;
+    const FPS_HISTORY_SIZE = 60; // Track last 60 readings
 
     app.ticker.add(() => {
         frameCount++;
@@ -651,6 +985,23 @@ async function init() {
             fps = Math.round(frameCount * 1000 / (currentTime - lastTime));
             frameCount = 0;
             lastTime = currentTime;
+
+            // Update FPS statistics
+            fpsHistory.push(fps);
+            if (fpsHistory.length > FPS_HISTORY_SIZE) {
+                fpsHistory.shift(); // Keep only last 60 readings
+            }
+
+            // Calculate min/max
+            minFPS = Math.min(minFPS, fps);
+            maxFPS = Math.max(maxFPS, fps);
+
+            // Calculate average
+            avgFPS = Math.round(fpsHistory.reduce((sum, val) => sum + val, 0) / fpsHistory.length);
+
+            // Calculate efficiency (percentage of how well we maintain 60 FPS)
+            efficiency = Math.round((avgFPS / 60) * 100);
+
             updateStats();
         }
     });
@@ -658,10 +1009,21 @@ async function init() {
     function updateStats() {
         const showing = filteredThumbnails.length;
         const total = thumbnails.length;
-        const text = showing === total
-            ? `Items: ${total.toLocaleString()} | FPS: ${fps}`
-            : `Items: ${showing.toLocaleString()} / ${total.toLocaleString()} | FPS: ${fps}`;
-        document.getElementById('stats').textContent = text;
+
+        // Determine efficiency color
+        let effColor = '#34d399'; // Green
+        if (efficiency < 80) effColor = '#fbbf24'; // Yellow
+        if (efficiency < 60) effColor = '#f87171'; // Red
+
+        const itemsText = showing === total
+            ? `Items: ${total.toLocaleString()}`
+            : `Items: ${showing.toLocaleString()} / ${total.toLocaleString()}`;
+
+        const fpsText = fpsHistory.length < 3
+            ? `FPS: ${fps}`
+            : `FPS: ${fps} | Min: ${minFPS} | Max: ${maxFPS} | Avg: ${avgFPS} | <span style="color: ${effColor}">Eff: ${efficiency}%</span>`;
+
+        document.getElementById('stats').innerHTML = `${itemsText} | ${fpsText}`;
     }
 
     // ============================================
@@ -732,12 +1094,15 @@ async function init() {
     // INITIAL LOAD
     // ============================================
 
-    console.log('App ready. Click "Load 1,000" to start.');
+    console.log('[INIT] Step 100: App ready. Click "Load 1,000" to start.');
     updateStats();
+    console.log('[INIT] COMPLETE - All event handlers attached');
 }
 
 // Start the app
+console.log('[APP] Starting initialization...');
 init().catch(err => {
-    console.error('Failed to initialize app:', err);
-    document.body.innerHTML = '<div style="color: white; padding: 20px;">Error: ' + err.message + '</div>';
+    console.error('[APP] CRITICAL ERROR - Failed to initialize app:', err);
+    console.error('[APP] Error stack:', err.stack);
+    document.body.innerHTML = '<div style="color: white; padding: 20px;">Error: ' + err.message + '<br><br>' + err.stack + '</div>';
 });
